@@ -26,6 +26,7 @@
 
 (require 'gradle)
 (require 'cl-lib)
+(require 'jdee)
 
 (defgroup jdee-gradle nil
   "JDEE Gradle"
@@ -173,10 +174,10 @@ and filters out those not appropriate for the current subproject."
   (let ((tasks (jdee-gradle-get-tasks)))
     (if (null jdee-gradle-subproject-name)
         tasks
-      ;; TODO -- fix this up
-      (remove-if (lambda (x) 
-                   (not (string-match (concat "\\(^-\\|" (regexp-quote jdee-gradle-subproject-name) ":\\)") x)))
-                 tasks))))
+      ;; TODO -- fix this
+      (cl-remove-if (lambda (x) 
+                      (not (string-match (concat "\\(^-\\|" (regexp-quote jdee-gradle-subproject-name) ":\\)") x)))
+                    tasks))))
 
 (defcustom jdee-gradle-build-options '("--console=plain")
   "List of additional options to pass to gradle."
