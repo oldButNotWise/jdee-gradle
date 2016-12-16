@@ -20,7 +20,40 @@
 
 ;;; Commentary:
 
-;; 
+;; This file adds support to JDEE for projects that use Gradle.
+
+;; Requirements:
+;;   * The gradle-el package; see https://github.com/vhallac/gradle-el
+;;   * A recent version of JDEE
+
+;; Optional:
+;;   * The gradle "jdee" task definition; see http://ignatyev-dev.blogspot.com/2013/07/gradle-projects-in-jdee.html.
+;;     Edit it so it produces the file "prj-generated.el" instead of "prj.el".
+
+;; Usage:
+;; Put this file somewhere in your elisp search-path.
+;; You might want to byte-compile it, but that isn't necessary.
+;;
+;; For a simple gradle project (without sub-projects), visit the prj.el file at the root of the project.
+;; The function M-x jdee-gradle-gen-single-project-file to insert a simple
+;; JDEE project definition into the current buffer.
+
+;; For a gradle multi-project (with sub-projects), first visit the prj.el file at the root of the project
+;; and call the interactive command M-x jdee-gradle-gen-multi-project-file.
+;; Then for each sub-project visit the prj.el file at the root of the sub-project
+;; and call the interactive command M-x jdee-gradle-gen-sub-project-file.
+
+;; If you are using the gradle jdee task, edit the build.gradle file and add the code
+;;
+;;    apply from: "jdee-gradle-install-directory/jdee.gradle"
+;;
+;; or, for the root of a multi-project,
+;;
+;;    allprojects {
+;;        apply from: "${rootDir}/src/ide/emacs/jdee.gradle"
+;;    }
+;;
+;; Then run "gradlew jdee".
 
 ;;; Code:
 
@@ -33,36 +66,29 @@
   :group 'jdee
   :prefix "jdee-gradle-")
 
-(defcustom jdee-gradle-project-root nil
+(defvar jdee-gradle-project-root nil
   "*Base directory for the Gradle project.
-For sub-projects, this is the directory of the top-level project."
-  :group 'jdee-gradle
-  :type 'string)
-(make-local-variable 'jdee-gradle-project-root)
+For sub-projects, this is the directory of the top-level project.")
+(make-variable-buffer-local 'jdee-gradle-project-root)
 
-(defcustom jdee-gradle-project-name nil
+(defvar jdee-gradle-project-name nil
   "Name of the Gradle project.
-For sub-projects, this is the name of the top-level project."
-  :group 'jdee-gradle
-  :type 'string)
-(make-local-variable 'jdee-gradle-project-name)
+For sub-projects, this is the name of the top-level project.")
+(make-variable-buffer-local 'jdee-gradle-project-name)
 
-(defcustom jdee-gradle-subproject-root nil
-  "Root directory of the Gradle subproject, if any."
-  :group 'jdee-gradle
-  :type 'string)
-(make-local-variable 'jdee-gradle-subproject-root)
+(defvar jdee-gradle-subproject-root nil
+  "Root directory of the Gradle subproject, if any.")
+(make-variable-buffer-local 'jdee-gradle-subproject-root)
 
-(defcustom jdee-gradle-subproject-name nil
-  "Name of the Gradle sub-project, if any."
-  :group 'jdee-gradle
-  :type 'string)
-(make-local-variable 'jdee-gradle-subproject-name)
+(defvar jdee-gradle-subproject-name nil
+  "Name of the Gradle sub-project, if any.")
+(make-variable-buffer-local 'jdee-gradle-subproject-name)
 
 (defun jdee-gradle-module-dir ()
   "The name of this gradle (sub)project root directory."
   (or jdee-gradle-subproject-root jdee-gradle-project-root))
 
+;;;###autoload
 (defun jdee-gradle-set-project (&optional name dir force-top-level-p)
   "Define a Gradle project.
 Automatically determines if the project is a sub-project of a containing multi-project
@@ -114,6 +140,7 @@ See `gradle-with-project-root-func'."
 ;; Hooks when visiting a file in a Gradle JDEE project
 ;;
 
+;;;###autoload
 (defcustom jdee-gradle-project-hooks nil
   "Specifies a list of functions to be run when a gradle JDEE project
 becomes active."
@@ -121,6 +148,8 @@ becomes active."
   :type '(repeat (function :tag "Function")))
 
 (defun jdee-gradle-project-hook ()
+  "JDEE project hook that runs hooks on `jdee-gradle-project-hooks'
+if the current project is a gradle project."
   (if jdee-gradle-project-root
       (run-hooks 'jdee-gradle-project-hooks)))
 
@@ -174,16 +203,17 @@ and filters out those not appropriate for the current subproject."
   (let ((tasks (jdee-gradle-get-tasks)))
     (if (null jdee-gradle-subproject-name)
         tasks
-      ;; TODO -- fix this
+      ;; TODO -- fix this up
       (cl-remove-if (lambda (x) 
                       (not (string-match (concat "\\(^-\\|" (regexp-quote jdee-gradle-subproject-name) ":\\)") x)))
-                    tasks))))
+                 tasks))))
 
 (defcustom jdee-gradle-build-options '("--console=plain")
   "List of additional options to pass to gradle."
   :group 'jdee-gradle
   :type 'list)
 
+;;;###autoload
 (defun jdee-gradle-build ()
   "Invokes `gradle-run' to build the current project.
 The tasks to execute are found by calling `jdee-gradle-get-tasks'.
@@ -194,6 +224,147 @@ This function can be used as the value of `jdee-build-function'."
     (jdee-with-compile-finish-fn 'jdee-gradle-compile-fixup-task-newlines
       (gradle-run (append jdee-gradle-build-options (funcall jdee-gradle-get-tasks-function))))))
 
+;;
+;; Generating project files
+;;
+
+(defcustom jdee-gradle-gen-single-project-file-template
+  '((p "Project name: " project-name t)
+    > ";;" n
+    > ";; JDEE gradle project file for " (s project-name) n
+    > ";;" n
+    n
+    > "(require 'jdee-gradle)" n
+    n
+    > "(jdee-gradle-set-project \"" (s project-name) "\")" n
+    n
+    > ";; Load the generated prj file, if it exists" n
+    > "(if (not (load (expand-file-name \"prj-generated\" jdee-gradle-project-root) t))" n
+    > ";; It wasn't found, so set some defaults" n
+    > "(jdee-set-variables" n
+    > "`(jdee-sourcepath '(\"./src/main/java\" \"./src/test/java\"))" n
+    > "`(jdee-build-class-path '(\"./src/classes/main\" \"./src/classes/test\"))" n
+    > "`(jdee-global-classpath '(\"./src/classes/java\" \"./src/classes/test\"))" n
+    > "))" n
+    n
+    > ";;" n
+    > ";; Add other settings here" n
+    > ";;" n
+    )
+  "Template for new jdee-gradle single-project file.
+Setting this variable defines a template instantiation command
+`jdee-gradle-gen-single-project-file' as a side-effect."
+  :group 'jdee-gradle
+  :type '(repeat string)
+  :set (lambda (sym val)
+         (tempo-define-template "jdee-gradle-single-project-file-template"
+                                val
+                                nil
+                                "Insert a generic jdee-gradle single-project file.")
+         (defalias 'jdee-gradle-gen-single-project-file
+           `(lambda (is-interactive)
+              (interactive "p")
+              (let ((tempo-interactive is-interactive))
+                (tempo-template-jdee-gradle-single-project-file-template))))
+         (set-default sym val)))
+
+(defcustom jdee-gradle-gen-multi-project-file-template
+  '((p "Project name: " project-name t)
+    > ";;" n
+    > ";; JDEE gradle project file for the root of the multi-project " (s project-name) n
+    > ";;" n
+    n
+    > "(require 'jdee-gradle)" n
+    n
+    > "(defconst " (s project-name) "::subprojects" n
+    > "(mapcar (lambda (d) (expand-file-name d jdee-gradle-project-root))" n
+    > "'(" n
+    > ";; Insert subdirectory names here" n
+    > ")" n
+    > "\"List of directories containing " (s project-name) " sub-projects.\")" n
+    > ")" n
+    n
+    > "(defun " (s project-name) "::subproject (name)" n
+    > "\"Define a " (s project-name) " subproject." n
+    > "This is intended to be called from the sub-project JDEE project (prj.el) file.\"" n
+    > "(jdee-gradle-set-project-name name)" n
+    > "(let ((dir (jdee-gradle-module-dir))" n
+    > "(src-file (buffer-file-name)))" n
+    > ";; Load the generated prj file, if it exists" n
+    > "(if (not (load (expand-file-name \"prj-generated\" jdee-gradle-project-root) t))" n
+    > ";; It wasn't found, so set some defaults" n
+    > "(jdee-set-variables" n
+    > "`(jdee-sourcepath ',(cl-mapcon (lambda (p) (list (expand-file-name \"src/main/java\" p)" n
+    > "(expand-file-name \"src/test/java\" p)))" n
+    > (s project-name) "::subprojects))" n
+    > "`(jdee-build-class-path ',(cl-mapcon (lambda (p) (list (expand-file-name \"src/classes/main\" p)" n
+    > "(expand-file-name \"src/classes/test\" p)))" n
+    > (s project-name) "::subprojects))" n
+    > "`(jdee-global-classpath ',(cl-mapcon (lambda (p) (list (expand-file-name \"src/classes/main\" p)" n
+    > "(expand-file-name \"src/classes/test\" p)))" n
+    > (s project-name) "::subprojects))" n
+    > "))" n
+    > ";; Other settings whose value depends on the particular sub-project go here" n
+    > "(jdee-set-variables" n
+    > "`(jdee-compile-option-directory ,(expand-file-name (if (and src-file (string-match-p \"/test/\" src-file))" n
+    > "\"build/classes/test\"" n
+    > "\"build/classes/main\") dir))" n
+    > "))" n
+    > ")" n
+    n
+    > ";;"
+    > ";; Settings whose value is indendent of the particular subproject go here." n
+    > ";; Note that these will apply to all sub-projects." n
+    > ";;" n
+    )
+  "Template for new jdee-gradle project file.
+Setting this variable defines a template instantiation command
+`jdee-gradle-gen-multi-project-file' as a side-effect."
+  :group 'jdee-gradle
+  :type '(repeat string)
+  :set (lambda (sym val)
+         (tempo-define-template "jdee-gradle-multi-project-file-template"
+                                val
+                                nil
+                                "Insert a generic jdee-gradle multi-project file.")
+         (defalias 'jdee-gradle-gen-multi-project-file
+           `(lambda (is-interactive)
+              (interactive "p")
+              (let ((tempo-interactive is-interactive))
+                (tempo-template-jdee-gradle-multi-project-file-template))))
+         (set-default sym val)))
+
+(defcustom jdee-gradle-gen-sub-project-file-template
+  '((p "Main project name: " project-name t)
+    (p "Full sub-project name: " sub-project-name t)
+    > ";;" n
+    > ";; JDEE gradle project file for the sub-project " (s sub-project-name) n
+    > ";; Note that this gets loaded after the top-level project file," n
+    > ";; so any setting here will override values set there." n
+    > ";;" n
+    n
+    > "(" (s project-name) "::subproject \"" (s sub-project-name) "\")" n
+    n
+    > ";;"
+    > ";; Other sub-project specific settings go here." n
+    > ";;" n
+    )
+  "Template for new jdee-gradle project file.
+Setting this variable defines a template instantiation command
+`jdee-gradle-gen-sub-project-file' as a side-effect."
+  :group 'jdee-gradle
+  :type '(repeat string)
+  :set (lambda (sym val)
+         (tempo-define-template "jdee-gradle-sub-project-file-template"
+                                val
+                                nil
+                                "Insert a generic jdee-gradle sub-project file.")
+         (defalias 'jdee-gradle-gen-sub-project-file
+           `(lambda (is-interactive)
+              (interactive "p")
+              (let ((tempo-interactive is-interactive))
+                (tempo-template-jdee-gradle-sub-project-file-template))))
+         (set-default sym val)))
 
 (provide 'jdee-gradle)
 
