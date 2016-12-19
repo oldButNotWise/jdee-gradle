@@ -159,7 +159,12 @@ if the current project is a gradle project."
 ;; Building with Gradle
 ;;
 
-(defun jdee-gradle-compile-fixup-task-newlines (buffer msg)
+(defcustom jdee-gradle-build-options '("--console=plain")
+  "List of additional options to pass to gradle."
+  :group 'jdee-gradle
+  :type 'list)
+
+(defun jdee-gradle-compile-fixup-task-newlines (buffer _msg)
   ;; Gradle can leave the task name (like ":myproj:compileJava") at the beginning of a line, resulting in lines like
   ;; :myproj:compileJava/home/myname/myproj/src/main/java/com/mycorp/myproj/MyClass.java:84: error: invalid method declaration; return type required
   ;; This function scans over the buffer, looking for likely such lines, and inserts an appropriate newline.
@@ -195,23 +200,31 @@ This runs Gradle to get a list of all available tasks,
 and then prompts you pick from that list."
   (gradle--input-commandline))
 
+;; Optional code to prompt only with subproject tasks
+
+(defun jdee-gradle-subproject-filter-tasks (tasks)
+  "Filters a list of Gradle tasks to include only those matching the current subproject name."
+  (if jdee-gradle-subproject-name
+      (cl-remove-if (lambda (x) 
+                      (not (string-match (concat "\\(^-\\|" (regexp-quote jdee-gradle-subproject-name) ":\\)") x)))
+                    tasks)
+    tasks))
+
+(defvar jdee-gradle-get-task-filter nil
+  "Filter function to apply to list of tasks found by `gradle--get-task-list'.")
+
+(defadvice gradle--get-task-list (after jdee-gradle-get-task-filter activate)
+  "Apply the value of `jdee-gradle-get-task-filter' to the tasks that are found."
+  (if jdee-gradle-get-task-filter
+      (setq ad-return-value (funcall jdee-gradle-get-task-filter ad-return-value))))
+
 (defun jdee-gradle-get-subproject-tasks ()
   "Gets the Gradle task(s) to run when doing a build;
 see `jdee-gradle-get-tasks-function'.
 This runs Gradle to get a list of all available tasks
 and filters out those not appropriate for the current subproject."
-  (let ((tasks (jdee-gradle-get-tasks)))
-    (if (null jdee-gradle-subproject-name)
-        tasks
-      ;; TODO -- fix this up
-      (cl-remove-if (lambda (x) 
-                      (not (string-match (concat "\\(^-\\|" (regexp-quote jdee-gradle-subproject-name) ":\\)") x)))
-                 tasks))))
-
-(defcustom jdee-gradle-build-options '("--console=plain")
-  "List of additional options to pass to gradle."
-  :group 'jdee-gradle
-  :type 'list)
+  (let ((jdee-gradle-get-task-filter 'jdee-gradle-subproject-filter-tasks))
+    (gradle--input-commandline)))
 
 ;;;###autoload
 (defun jdee-gradle-build ()
