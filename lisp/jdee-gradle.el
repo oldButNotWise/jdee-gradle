@@ -243,26 +243,40 @@ This function can be used as the value of `jdee-build-function'."
 
 (defcustom jdee-gradle-gen-single-project-file-template
   '((p "Project name: " project-name t)
-    > ";;" n
-    > ";; JDEE gradle project file for " (s project-name) n
-    > ";;" n
+    ";;" > n
+    ";; JDEE gradle project file for " (s project-name) > n
+    ";;" > n
     n
-    > "(require 'jdee-gradle)" n
+    "(require 'jdee-gradle)" > n
     n
-    > "(jdee-gradle-set-project \"" (s project-name) "\")" n
+    "(jdee-gradle-set-project \"" (s project-name) "\" nil t)" > n
     n
-    > ";; Load the generated prj file, if it exists" n
-    > "(if (not (load (expand-file-name \"prj-generated\" jdee-gradle-project-root) t))" n
-    > ";; It wasn't found, so set some defaults" n
-    > "(jdee-set-variables" n
-    > "`(jdee-sourcepath '(\"./src/main/java\" \"./src/test/java\"))" n
-    > "`(jdee-build-class-path '(\"./src/classes/main\" \"./src/classes/test\"))" n
-    > "`(jdee-global-classpath '(\"./src/classes/java\" \"./src/classes/test\"))" n
-    > "))" n
+    ";; Load the generated prj file, if it exists" > n
+    "(if (not (load (expand-file-name \"prj-generated\" jdee-gradle-project-root) t))" > n
+    "  ;; It wasn't found, so set some defaults" > n
+    "  (jdee-set-variables" > n
+    "   `(jdee-sourcepath '(\"./src/main/java\" \"./src/test/java\"))" > n
+    "   `(jdee-build-class-path '(\"./build/classes/main\" \"./build/classes/test\"))" > n
+    "   `(jdee-global-classpath '(\"./build/classes/main\" \"./build/classes/test\"))" > n
+    "   ))" > n
     n
-    > ";;" n
-    > ";; Add other settings here" n
-    > ";;" n
+    "(jdee-set-variables" > n
+    " `(jdee-jdk-doc-url ,(format \"http://docs.oracle.com/javase/%s/docs/api/index.html\" (jdee-java-minor-version)))" > n
+    " `(jdee-compile-option-directory ,(let ((src-file (buffer-file-name)))" > n
+    " (if (and src-file (string-match-p \"/test/\" src-file))" > n
+    "     \"./build/classes/test\"" > n
+    "   \"./build/classes/main\")))" > n
+    " `(jdee-help-docsets '((\"" (s project-name) "\" ,(concat \"file://\" (expand-file-name \"build/docs/javadoc\" jdee-gradle-project-root)) nil)" > n
+    "                       (nil ,(format \"http://docs.oracle.com/javase/%s/docs/api\" (jdee-java-minor-version))" > n
+    "                            ,(format \"1.%s\" (jdee-java-minor-version)))" > n
+    "                       ))" > n
+    " `(jdee-run-working-directory ,jdee-gradle-project-root)" > n
+    ")" > n
+    n
+    ";;" > n
+    ";; Add other settings here" > n
+    ";;" > n
+    n
     )
   "Template for new jdee-gradle single-project file.
 Setting this variable defines a template instantiation command
@@ -283,52 +297,69 @@ Setting this variable defines a template instantiation command
 
 (defcustom jdee-gradle-gen-multi-project-file-template
   '((p "Project name: " project-name t)
-    > ";;" n
-    > ";; JDEE gradle project file for the root of the multi-project " (s project-name) n
-    > ";;" n
+    ";;" > n
+    ";; JDEE gradle project file for the root of the multi-project " (s project-name) > n
+    ";;" > n
     n
-    > "(require 'jdee-gradle)" n
+    "(require 'jdee-gradle)" > n
     n
-    > "(defconst " (s project-name) "::subprojects" n
-    > "(mapcar (lambda (d) (expand-file-name d jdee-gradle-project-root))" n
-    > "'(" n
-    > ";; Insert subdirectory names here" n
-    > ")" n
-    > "\"List of directories containing " (s project-name) " sub-projects.\")" n
-    > ")" n
+    "(jdee-gradle-set-project \"" (s project-name) "\" nil t)" > n
     n
-    > "(defun " (s project-name) "::subproject (name)" n
-    > "\"Define a " (s project-name) " subproject." n
-    > "This is intended to be called from the sub-project JDEE project (prj.el) file.\"" n
-    > "(jdee-gradle-set-project-name name)" n
-    > "(let ((dir (jdee-gradle-module-dir))" n
-    > "(src-file (buffer-file-name)))" n
-    > ";; Load the generated prj file, if it exists" n
-    > "(if (not (load (expand-file-name \"prj-generated\" jdee-gradle-project-root) t))" n
-    > ";; It wasn't found, so set some defaults" n
-    > "(jdee-set-variables" n
-    > "`(jdee-sourcepath ',(cl-mapcon (lambda (p) (list (expand-file-name \"src/main/java\" p)" n
-    > "(expand-file-name \"src/test/java\" p)))" n
-    > (s project-name) "::subprojects))" n
-    > "`(jdee-build-class-path ',(cl-mapcon (lambda (p) (list (expand-file-name \"src/classes/main\" p)" n
-    > "(expand-file-name \"src/classes/test\" p)))" n
-    > (s project-name) "::subprojects))" n
-    > "`(jdee-global-classpath ',(cl-mapcon (lambda (p) (list (expand-file-name \"src/classes/main\" p)" n
-    > "(expand-file-name \"src/classes/test\" p)))" n
-    > (s project-name) "::subprojects))" n
-    > "))" n
-    > ";; Other settings whose value depends on the particular sub-project go here" n
-    > "(jdee-set-variables" n
-    > "`(jdee-compile-option-directory ,(expand-file-name (if (and src-file (string-match-p \"/test/\" src-file))" n
-    > "\"build/classes/test\"" n
-    > "\"build/classes/main\") dir))" n
-    > "))" n
-    > ")" n
+    "(defconst " (s project-name) "::subprojects" > n
+    "  (mapcar (lambda (d) (expand-file-name d jdee-gradle-project-root))" > n
+    "          '(" > n
+    "            ;; Insert subdirectory names here" > n
+    "            )" > n
+    "          \"List of directories containing " (s project-name) " sub-projects.\")" > n
+    "  )" > n
     n
-    > ";;"
-    > ";; Settings whose value is indendent of the particular subproject go here." n
-    > ";; Note that these will apply to all sub-projects." n
-    > ";;" n
+    "(defun " (s project-name) "::subproject (name)" > n
+    "  \"Define a " (s project-name) " subproject." > n
+    "This is intended to be called from the sub-project JDEE project (prj.el) file.\"" > n
+    "  (jdee-gradle-set-project-name name)" > n
+    "  (let ((dir (jdee-gradle-module-dir))" > n
+    "        (src-file (buffer-file-name)))" > n
+    "    ;; Load the generated prj file, if it exists" > n
+    "    (if (not (load (expand-file-name \"prj-generated\" jdee-gradle-project-root) t))" > n
+    "        ;; It wasn't found, so set some defaults" > n
+    "        (jdee-set-variables" > n
+    "         `(jdee-sourcepath ',(cl-mapcon (lambda (p) (list (expand-file-name \"src/main/java\" p)" > n
+    "                                                          (expand-file-name \"src/test/java\" p)))" > n
+    "                                        " (s project-name) "::subprojects))" > n
+    "         `(jdee-build-class-path ',(cl-mapcon (lambda (p) (list (expand-file-name \"build/classes/main\" p)" > n
+    "                                                                (expand-file-name \"build/classes/test\" p)))" > n
+    "                                              " (s project-name) "::subprojects))" > n
+    "         `(jdee-global-classpath ',(cl-mapcon (lambda (p) (list (expand-file-name \"build/classes/main\" p)" > n
+    "                                                                (expand-file-name \"build/classes/test\" p)))" > n
+    "                                              " (s project-name) "::subprojects))" > n
+    "         ))" > n
+    "    ;; Other settings whose value depends on the particular sub-project go here" > n
+    "    (jdee-set-variables" > n
+    "     `(jdee-compile-option-directory ,(expand-file-name (if (and src-file (string-match-p \"/test/\" src-file))" > n
+    "                                                            \"build/classes/test\"" > n
+    "                                                          \"build/classes/main\") dir))" > n
+    "     `(jdee-run-working-directory ,dir)" > n
+    "     ))" > n
+    "  )" > n
+    n
+    "(jdee-set-variables" > n
+    " `(jdee-jdk-doc-url ,(format \"http://docs.oracle.com/javase/%s/docs/api/index.html\" (jdee-java-minor-version)))" n >
+    " `(jdee-help-docsets '(,@(cl-mapcar (lambda (p) (list p ,(concat \"file://\" (expand-file-name \"build/docs/javadoc\" p)) nil))" n >
+    "                                    " (s project-name) "::subprojects)" > n
+    "                       (nil ,(format \"http://docs.oracle.com/javase/%s/docs/api\" (jdee-java-minor-version))" > n
+    "                       ,(format \"1.%s\" (jdee-java-minor-version)))" > n
+    "                   ))" > n
+    " )" > n
+    n
+    ";;" > n
+    ";; Settings whose value is indendent of the particular subproject go here." > n
+    ";; Note that these will apply to all sub-projects." > n
+    ";;" > n
+    n
+    ";;" > n
+    ";; Add other settings here" > n
+    ";;" > n
+    n
     )
   "Template for new jdee-gradle project file.
 Setting this variable defines a template instantiation command
@@ -350,17 +381,18 @@ Setting this variable defines a template instantiation command
 (defcustom jdee-gradle-gen-sub-project-file-template
   '((p "Main project name: " project-name t)
     (p "Full sub-project name: " sub-project-name t)
-    > ";;" n
-    > ";; JDEE gradle project file for the sub-project " (s sub-project-name) n
-    > ";; Note that this gets loaded after the top-level project file," n
-    > ";; so any setting here will override values set there." n
-    > ";;" n
+    ";;" > n
+    ";; JDEE gradle project file for the sub-project " (s sub-project-name) > n
+    ";; Note that this gets loaded after the top-level project file," > n
+    ";; so any setting here will override values set there." > n
+    ";;" > n
     n
-    > "(" (s project-name) "::subproject \"" (s sub-project-name) "\")" n
+    "(" (s project-name) "::subproject \"" (s sub-project-name) "\")" > n
     n
-    > ";;"
-    > ";; Other sub-project specific settings go here." n
-    > ";;" n
+    ";;" > n
+    ";; Other sub-project specific settings go here." > n
+    ";;" > n
+    n
     )
   "Template for new jdee-gradle project file.
 Setting this variable defines a template instantiation command

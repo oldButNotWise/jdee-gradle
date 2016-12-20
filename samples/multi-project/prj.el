@@ -1,61 +1,73 @@
-;;;
-;;; Emacs project file for the multi-project example build.
-;;;
+;;
+;; JDEE gradle project file for the root of the multi-project example
+;;
 
 (require 'jdee-gradle)
 
-(jdee-gradle-set-project "example")
+(jdee-gradle-set-project "example" nil t)
 
 (defconst example::subprojects
   (mapcar (lambda (d) (expand-file-name d jdee-gradle-project-root))
-          '("sub1" "sub2"))
-  "List of directories containing Example subprojects")
+          '(
+            ;; Insert subdirectory names here
+            )
+          "List of directories containing example sub-projects.")
+  )
 
-(defun example::subproject (name) 
-  "Define a Example subproject.
-This is intended to be called from the subproject JDEE project (prj.el) file."
-  (jdee-gradle-set-project name)
+(defun example::subproject (name)
+  "Define a example subproject.
+This is intended to be called from the sub-project JDEE project (prj.el) file."
+  (jdee-gradle-set-project-name name)
   (let ((dir (jdee-gradle-module-dir))
         (src-file (buffer-file-name)))
     ;; Load the generated prj file, if it exists
-    (if (not (load (expand-file-name "prj-generated" dir) t))
-        ;; It wasn't found, so set some reasonable defaults
+    (if (not (load (expand-file-name "prj-generated" jdee-gradle-project-root) t))
+        ;; It wasn't found, so set some defaults
         (jdee-set-variables
          `(jdee-sourcepath ',(cl-mapcon (lambda (p) (list (expand-file-name "src/main/java" p)
                                                           (expand-file-name "src/test/java" p)))
                                         example::subprojects))
-         `(jdee-build-class-path ',(cl-mapcon (lambda (p) (list (expand-file-name "src/classes/main" p)
-                                                                (expand-file-name "src/classes/test" p)))
+         `(jdee-build-class-path ',(cl-mapcon (lambda (p) (list (expand-file-name "build/classes/main" p)
+                                                                (expand-file-name "build/classes/test" p)))
                                               example::subprojects))
-         `(jdee-global-classpath ',(cl-mapcon (lambda (p) (list (expand-file-name "src/classes/main" p)
-                                                                (expand-file-name "src/classes/test" p)))
+         `(jdee-global-classpath ',(cl-mapcon (lambda (p) (list (expand-file-name "build/classes/main" p)
+                                                                (expand-file-name "build/classes/test" p)))
                                               example::subprojects))
          ))
-    ;; And then some other settings (which may override values in the generated prj)
+    ;; Other settings whose value depends on the particular sub-project go here
     (jdee-set-variables
      `(jdee-compile-option-directory ,(expand-file-name (if (and src-file (string-match-p "/test/" src-file))
                                                             "build/classes/test"
                                                           "build/classes/main") dir))
      `(jdee-run-working-directory ,dir)
-     `(jdee-xref-db-base-directory ,(expand-file-name "build/jdee" dir))
      ))
   )
 
+(jdee-set-variables
+ `(jdee-jdk-doc-url ,(format "http://docs.oracle.com/javase/%s/docs/api/index.html" (jdee-java-minor-version)))
+ `(jdee-help-docsets '(,@(cl-mapcar (lambda (p) (list p ,(concat "file://" (expand-file-name "build/docs/javadoc" p)) nil))
+                                    example::subprojects)
+                       (nil ,(format "http://docs.oracle.com/javase/%s/docs/api" (jdee-java-minor-version))
+                            ,(format "1.%s" (jdee-java-minor-version)))
+                       ))
+ )
+
 ;;
-;; Settings that don't depend upon the sub-project
+;; Settings whose value is indendent of the particular subproject go here.
+;; Note that these will apply to all sub-projects.
+;;
+
+;;
+;; Add other settings here
 ;;
 
 ;;
 ;; Javadoc
 ;;
 (jdee-set-variables 
- `(jdee-jdk-doc-url ,(format "http://docs.oracle.com/javase/%s/docs/api/index.html" (jdee-java-minor-version)))
- `(jdee-help-docsets '((nil ,(format "http://docs.oracle.com/javase/%s/docs/api" (jdee-java-minor-version))
-                            ,(format "1.%s" (jdee-java-minor-version)))
+ `(jdee-help-docsets '(,@jdee-help-docsets
                        ("TestNG" "http://testng.org/javadocs" nil)
-                       ("JUnit" "http://junit.org/junit4/javadoc/latest" nil)
-                       ,@(cl-mapcar (lambda (p) (list p (concat "file://" (expand-file-name "build/docs/javadoc" p)) nil))
-                                    example::subprojects)))
+                       ("JUnit" "http://junit.org/junit4/javadoc/latest" nil)))
  )
 
 ;;
@@ -82,24 +94,6 @@ This is intended to be called from the subproject JDEE project (prj.el) file."
  `(jdee-javadoc-version-tag-template nil)
  `(jdee-javadoc-author-tag-template nil)
  )
-
-;;
-;; Debugging
-;; Want to use JDIBug, but that isn't directly supported, so declare JDEbug as the next best thing
-;;
-(let ((port "5005")                   ;default for IntelliJ
-      (heap 1024))
-  (jdee-set-variables
-   `(jdee-db-option-heap-size '((,heap . "megabytes") 
-                                (,heap . "megabytes")))
-   `(jdee-db-option-verbose   '(nil t nil)) ;print GC mesages
-   `(jdee-debugger '("JDEbug"))
-   `(jdee-db-option-connect-socket '(nil ,port))
-   `(jdee-run-option-debug '("Server" "Socket" nil nil ,port t))
-   `(jdee-bug-server-socket '(t ,port))
-   `(jdee-bug-debugger-host-address "localhost")
-   `(jdibug-connect-hosts '(,(concat "localhost:" port)))
-   ))
 
 ;;
 ;; Other tools
