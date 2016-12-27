@@ -17,18 +17,6 @@ Other required software, not included in this distribution:
   * [jdee](https://github.com/jdee-emacs/jdee)
 
 
-## Organization
-
-The [lisp](lisp) directory contains elisp code that sets up Gradle as the build tool for JDEE.
-
-The [lib](lib) directory contains a Gradle plugin that defines the "jdee" task.
-That task produces a JDEE project file named prj-generated.el that
-sets various JDEE path variables based on the workings of Gradle.
-This file can be loaded by the standard prj.el project file.
-
-The [samples](samples) directory contains sample template projects that use all this.
-
-
 ## Usage
 
 1. Copy the file [jdee-gradle](lisp/jdee-gradle.el) to a directory on your Emacs load-path.
