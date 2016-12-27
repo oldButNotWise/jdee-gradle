@@ -33,6 +33,8 @@
 ;; Usage:
 ;; Put this file somewhere in your elisp search-path.
 ;; You might want to byte-compile it, but that isn't necessary.
+;; The "entry point" to this code is the function `jdee-gradle-set-project':
+;; that note properties of the Gradle build, and binds the JDEE build function to use Gradle.
 ;;
 ;; For a simple gradle project (without sub-projects), visit the prj.el file at the root of the project.
 ;; The function M-x jdee-gradle-gen-single-project-file to insert a simple
@@ -53,7 +55,7 @@
 ;;        apply from: "${rootDir}/src/ide/emacs/jdee.gradle"
 ;;    }
 ;;
-;; Then run "gradlew jdee".
+;; Then run "gradlew assemble jdee".
 
 ;;; Code:
 
@@ -93,9 +95,9 @@ For sub-projects, this is the name of the top-level project.")
   "Define a Gradle project.
 Automatically determines if the project is a sub-project of a containing multi-project
 unless force-top-level-p is true.
-If not given dir defaults to the directory containing the project file currently being loaded.
-The top-level projects name defaults to the base name of dir; for sub-projects it defaults to
-MAIN-BASE where MAIN is the name of the top-level project and BASE is the base name of the dir.
+If not given, dir defaults to the directory containing the project file currently being loaded.
+For top-level projects, name defaults to the base name of dir; for sub-projects it defaults to
+MAIN-BASE where MAIN is the name of the top-level project and BASE is the base name of dir.
 Returns the value of dir that was found."
   (cond ((not (null dir)) )
         ((not (null jdee-loading-project-file))
@@ -239,6 +241,7 @@ This function can be used as the value of `jdee-build-function'."
 
 ;;
 ;; Generating project files
+;; These assume a Maven structured code base for the project
 ;;
 
 (defcustom jdee-gradle-gen-single-project-file-template

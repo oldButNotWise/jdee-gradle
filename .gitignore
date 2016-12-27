@@ -4,3 +4,6 @@
 *~
 \#*\#
 \.\#*
+
+# Generated files
+*.elc
