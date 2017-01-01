@@ -1,8 +1,8 @@
 ;;; jdee-gradle.el --- Gradle support for JDEE       -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2016 Netflix, Inc.
+;; Copyright (C) 2016
 
-;; Author: Stan Lanning <slanning@netflix.com>
+;; Author: Stan Lanning <github at oldbutnotwise dot org>
 ;; Keywords: java, tools, gradle
 
 ;; This program is free software; you can redistribute it and/or modify
