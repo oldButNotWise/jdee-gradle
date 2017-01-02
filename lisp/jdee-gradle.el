@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2016
 
-;; Author: Stan Lanning <github at oldbutnotwise dot org>
+;; Author: Stan Lanning <lanning at pobox dot com>
 ;; Keywords: java, tools, gradle
 
 ;; This program is free software; you can redistribute it and/or modify
