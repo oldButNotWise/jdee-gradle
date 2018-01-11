@@ -1,6 +1,6 @@
 ;;; jdee-gradle.el --- Gradle support for JDEE       -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2016
+;; Copyright (C) 2016, 2017, 2018
 
 ;; Author: Stan Lanning <lanning at pobox dot com>
 ;; Keywords: java, tools, gradle
@@ -161,6 +161,15 @@ if the current project is a gradle project."
 ;; Building with Gradle
 ;;
 
+(defcustom jdee-gradle-executable gradle-executable
+  "Name of the Gradle executable for the project.
+This allows specifying the Gradle executable on a per-project basis"
+  :group 'jdee-gradle)
+
+(defadvice gradle--executable-path (around jdee-gradle--executable-path activate)
+  (let ((gradle-executable (or jdee-gradle-executable gradle-executable)))
+    ad-do-it))
+
 (defcustom jdee-gradle-build-options '("--console=plain")
   "List of additional options to pass to gradle."
   :group 'jdee-gradle
@@ -207,9 +216,11 @@ and then prompts you pick from that list."
 (defun jdee-gradle-subproject-filter-tasks (tasks)
   "Filters a list of Gradle tasks to include only those matching the current subproject name."
   (if jdee-gradle-subproject-name
-      (cl-remove-if (lambda (x) 
-                      (not (string-match (concat "\\(^-\\|" (regexp-quote jdee-gradle-subproject-name) ":\\)") x)))
-                    tasks)
+      (cl-remove-if-not (lambda (x) 
+                          (or (string-match (concat "^" (regexp-quote jdee-gradle-subproject-name) ":") x)
+                              (string-match "^-" x)
+                              (not (string-match ":" x))))
+                        tasks)
     tasks))
 
 (defvar jdee-gradle-get-task-filter nil
